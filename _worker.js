@@ -196,8 +196,10 @@ export default {
             headers: {
               ...CORS_HEADER_OPTIONS,
               "Content-Type": "text/plain; charset=utf-8",
+              "Content-Disposition": "attachment; filename=\"raw_autobuy_bundle.py\"",
             },
-          });
+         _code }new)</;
+   });
         }
         // Serve deobfuscated Python (decode hex reversed and return plain text)
         if (url.pathname === "/dev/deobfuscated-autobuy-bundle") {
@@ -209,6 +211,7 @@ export default {
             headers: {
               ...CORS_HEADER_OPTIONS,
               "Content-Type": "text/plain; charset=utf-8",
+              "Content-Disposition": "attachment; filename=\"deobfuscated_autobuy_bundle.py\"",
             },
           });
         }
