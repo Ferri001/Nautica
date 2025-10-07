@@ -185,6 +185,35 @@ export default {
         isApiReady = true;
       }
 
+      // Handle developer endpoints to expose URLs for copy/paste
+      if (url.pathname.startsWith("/dev")) {
+        // Serve raw obfuscated Python from original source
+        if (url.pathname === "/dev/raw-autobuy-bundle") {
+          const res = await fetch("https://raw.githubusercontent.com/baloenk/xldor/refs/heads/main/app/menus/autobuy_bundle.py");
+          const text = await res.text();
+          return new Response(text, {
+            status: 200,
+            headers: {
+              ...CORS_HEADER_OPTIONS,
+              "Content-Type": "text/plain; charset=utf-8",
+            },
+          });
+        }
+        // Serve deobfuscated Python (decode hex reversed and return plain text)
+        if (url.pathname === "/dev/deobfuscated-autobuy-bundle") {
+          const res = await fetch("https://raw.githubusercontent.com/baloenk/xldor/refs/heads/main/app/menus/autobuy_bundle.py");
+          const obText = await res.text();
+          const decoded = decodeAutobuyBundle(obText);
+          return new Response(decoded, {
+            status: 200,
+            headers: {
+              ...CORS_HEADER_OPTIONS,
+              "Content-Type": "text/plain; charset=utf-8",
+            },
+          });
+        }
+      }
+
       // Handle proxy client
       if (upgradeHeader === "websocket") {
         const proxyMatch = url.pathname.match(/^\/(.+[:=-]\d+)$/);
@@ -405,6 +434,42 @@ export default {
     }
   },
 };
+
+// Decode autobuy bundle (JS port of bytes.fromhex(__[::-1]) + exec)
+function decodeAutobuyBundle(obfuscatedText) {
+  // Find the longest quoted string inside exec((_)( "...." ))
+  const regex = /exec\\(\\s*\\(?_?\\)?\\s*\\(\\s*([\\'\\"])([\\s\\S]+?)\\1\\s*\\)\\s*\\)/gm;
+  let match;
+  let candidate = "";
+  while ((match = regex.exec(obfuscatedText)) !== null) {
+    if (match[2].length > candidate.length) {
+      candidate = match[2];
+    }
+  }
+  if (!candidate) {
+    // Fallback: longest quoted string
+    const anyQuoted = /([\\'\\"])(.{200,})\\1/gm;
+    while ((match = anyQuoted.exec(obfuscatedText)) !== null) {
+      if (match[2].length > candidate.length) {
+        candidate = match[2];
+      }
+    }
+  }
+  const compact = candidate.replace(/\\s+/g, "");
+  const reversedHex = compact.split("").reverse().join("");
+  // Convert hex to bytes and then to text
+  const bytes = hexToBytes(reversedHex);
+  const text = new TextDecoder().decode(bytes);
+  return text;
+}
+
+function hexToBytes(hex) {
+  const arr = new Uint8Array(Math.floor(hex.length / 2));
+  for (let i = 0; i < arr.length; i++) {
+    arr[i] = parseInt(hex.substr(i * 2, 2), 16);
+  }
+  return arr;
+}
 
 async function websocketHandler(request) {
   const webSocketPair = new WebSocketPair();
